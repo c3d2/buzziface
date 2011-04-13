@@ -22,3 +22,8 @@ antwort : <KEYID> | "X" (timeout)
 opcode "L"
 args	: <LEDID>  <BRIGHT>
 funktion:	set_led_state
+
+opcode "R"
+funktion:	reset BuzIface
+
+
