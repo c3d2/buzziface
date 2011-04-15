@@ -10,11 +10,11 @@
 typedef uint8_t u8;
 
 //---BUZZER CHANNELS
-#define CHAN_A 0
-#define CHAN_B 1
-#define CHAN_C 2
-#define CHAN_D 3
-#define CHAN_E 4
+#define CHAN_A 1
+#define CHAN_B 2
+#define CHAN_C 3
+#define CHAN_D 4
+#define CHAN_E 5
 #define CHAN_NUM 5
 
 //---BUZZER-HARDWARE CANNEL CONFIGURATION

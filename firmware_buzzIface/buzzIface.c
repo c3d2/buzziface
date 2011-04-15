@@ -47,6 +47,8 @@ volatile uint8_t key_buf;
 #define MASKI_B (0x03)
 #define MASKI_D (0xd0)
 #define SENDPLACESIZE (8)
+#define DEBUG_SENDPLACE_ON
+
 #undef KEYS_HAVE_EXTERN_PULLUP
 
 volatile uint8_t phasemask_b;
@@ -64,29 +66,33 @@ struct channel cz[5];
 ISR(PCINT0_vect)
 {
 	uint8_t act ;
-	act = ~PINB & (MASKI_B & phasemask_b);
-	if (act){
-	USART_puts('P');
+	act = ~PINB & (MASKI_B);
+	if (act){  //one ore some of allowed ins are high
+	USART_puts("p");
 	//USART_putc('0'+ act);
 		switch (act){
 			case (1 << 0): //Chan A key is B0 --> PCINT0 
 			case (1 << 1): //Chan B key is B1 --> PCINT1
+				USART_putc('0'+act);
+				PCMSK0 &= ~(act);
 				phasemask_b &= ~(act);
-				USART_putc('0'+ phasemask_b);
-				USART_putc(']');
 				sendline[sendplace++] = act;
 					break;
 			default :
-				sendline[sendplace++] = 0xff;
+				sendline[sendplace++] = 'G'; //invalid
 
 		}
-		//sendplace = (sendplace +1) % SENDPLACESIZE;
+#ifdef DEBUG_SENDPLACE_ON
+		if(sendplace >7) USART_puts("Xsenpl>7\n\r");
+#endif 
 	} 
 }
 
 ISR(PCINT2_vect) {
 	uint8_t act,c ;
-	act = ~PIND & MASKI_D & phasemask_d;
+	act = ~PIND & MASKI_D ;
+	USART_puts("Xfickn\n\r");
+
 	if (act){
 		switch (act){
 			case (1 << 6): //Chan C key is D6 --> PCINT22
@@ -107,8 +113,10 @@ ISR(PCINT2_vect) {
 			default :
 				c= 0xff;
 		}
-		sendline[sendplace] = c;
-		sendplace = (sendplace +1) % SENDPLACESIZE;
+		sendline[sendplace++] = c;
+#ifdef DEBUG_SENDPLACE_ON
+		if(sendplace >7) USART_puts("Xsenpl>7\n\r");
+#endif
 	}
 }
 
@@ -117,15 +125,15 @@ ISR(TIMER0_COMPA_vect) {
 	uint8_t j;
 
 	//bis die letzte phase ausgeschaltet worden:
-	j = MASKI_B & ( PCMSK0 ^ MASKI_B) ;
-	PCMSK0 = MASKI_B;
-	//in der phasenmaske nur die setzen die zu j nicht gehören
-	phasemask_b |= MASKI_B & (~ j) ;
+	j = MASKI_B & ( phasemask_b ^ MASKI_B) ;
+	phasemask_b = MASKI_B;
+	//im pCMSK re nur die setzen die wieder an, die zu j nicht gehören, weil sie schon in der vorletzten phae deaktiviert wurden
+	PCMSK0 |= (MASKI_B & (~ j) ) ;
 
 	//same for PCIE2
-	j = MASKI_D * (PCMSK2 ^ MASKI_D) ;
-	PCMSK2 = MASKI_D ;
-	phasemask_d |= MASKI_D & ( ~ j) ;
+	j = MASKI_D & (phasemask_d ^ MASKI_D) ;
+	phasemask_d = MASKI_D ;
+	PCMSK2 |= (MASKI_D & ( ~ j)) ;
 
 }
 
@@ -246,6 +254,8 @@ uint8_t set_led_state(ledid_t  led_id, uint8_t brightness)
 uint8_t send_uart_key(uint8_t key){
 	char c ;
 	char buf[5] = "K%\n\r";
+	USART_puts("k:");
+	USART_putc(96+key);
 	switch (key){
 		case CHAN_A:
 			c = 'A';
@@ -345,12 +355,16 @@ int main(void)
 		/*PART 2 : send stuff to send,  if any... */
 		i = 0;
 		cli();  //prevent sendplace from bein altered //TODO: better only disable all PC IRQS
-		while (i < sendplace ) {
-			 send_uart_key(sendline[sendplace]);
-			 i++;
+		if (i<sendplace){
+			USART_puts("snd buf:");
+			while (i < sendplace ) {
+				USART_putc('0'+i);
+				send_uart_key(sendline[sendplace]);
+				i++;
+			}
+			//sendplace = 0;
+			USART_puts("flushed\n\r");
 		}
-		sendplace = 0;
-
 		sei();
 	}
 
