@@ -66,10 +66,14 @@ ISR(PCINT0_vect)
 	uint8_t act ;
 	act = ~PINB & (MASKI_B & phasemask_b);
 	if (act){
+	USART_puts('P');
+	//USART_putc('0'+ act);
 		switch (act){
 			case (1 << 0): //Chan A key is B0 --> PCINT0 
 			case (1 << 1): //Chan B key is B1 --> PCINT1
 				phasemask_b &= ~(act);
+				USART_putc('0'+ phasemask_b);
+				USART_putc(']');
 				sendline[sendplace++] = act;
 					break;
 			default :
