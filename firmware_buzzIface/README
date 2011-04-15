@@ -12,18 +12,12 @@ BuzIface: Interface Platine (USB client)
 
 Befehle vom BuzIface zum Server
 
-
-opcode: "W"
-args  	:	 keymask (ein byte, bits 1-4 bedeuten die keys A-D) 
-funktion:	 wait_keys_blocking(keymask) hier timeout adden ???
-antwort : <KEYID> | "X" (timeout) 
-
-
 opcode "L"
 args	: <LEDID>  <BRIGHT>
 funktion:	set_led_state
 
-opcode "R"
-funktion:	reset BuzIface
+
+
+
 
 
