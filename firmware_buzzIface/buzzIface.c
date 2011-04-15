@@ -64,25 +64,25 @@ struct channel cz[5];
 ISR(PCINT0_vect)
 {
 	uint8_t act ;
-	act = PINB & (MASKI_B & phasemask_b);
+	act = ~PINB & (MASKI_B & phasemask_b);
 	if (act){
 		switch (act){
 			case (1 << 0): //Chan A key is B0 --> PCINT0 
 			case (1 << 1): //Chan B key is B1 --> PCINT1
 				phasemask_b &= ~(act);
-				sendline[sendplace] = act;
+				sendline[sendplace++] = act;
 					break;
 			default :
-				sendline[sendplace] = 0xff;
+				sendline[sendplace++] = 0xff;
 
 		}
-		sendplace = (sendplace +1) % SENDPLACESIZE;
+		//sendplace = (sendplace +1) % SENDPLACESIZE;
 	} 
 }
 
 ISR(PCINT2_vect) {
 	uint8_t act,c ;
-	act = PIND & MASKI_D & phasemask_d;
+	act = ~PIND & MASKI_D & phasemask_d;
 	if (act){
 		switch (act){
 			case (1 << 6): //Chan C key is D6 --> PCINT22
@@ -197,7 +197,7 @@ static inline void phasentimer_init()
 //(1.0/19) * 18 = 0.9473684 -> phasenwechsel alle ~ millisekunde
 	TCCR0A = 0 | (1 << WGM01);              // CTC Modus
 	TCCR0B = 0 | (1<< CS02) | (1<< CS00);   //Prescale 1024
-	OCR0A = 0x09 ; 				//9 ist 18/2 s.o.
+	OCR0A =  200; //0x09 ; 				//9 ist 18/2 s.o.
 	TIMSK0 = 0 |  (1<<OCIE0A);		//IRQ CTM erlauben 
 	return;
 }
@@ -346,6 +346,7 @@ int main(void)
 			 i++;
 		}
 		sendplace = 0;
+
 		sei();
 	}
 
