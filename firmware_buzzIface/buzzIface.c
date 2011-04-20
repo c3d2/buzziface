@@ -234,19 +234,19 @@ uint8_t set_led_state(ledid_t  led_id, uint8_t brightness)
 	switch (led_id.led){
 		case (0) :
 			if (brightness) {
-				USART_puts("on(l0)\r\n)");
+				USART_puts("on(l0)\r\n");
 				*(cz[ch].led2port) &= ~(cz[ch].led1pin) ;
 			} else {
-				USART_puts("off(l0)\r\n)");
+				USART_puts("off(l0)\r\n");
 				*(cz[ch].led1port) |= cz[ch].led1pin ;
 			}
 			break ;
 		case (1) :
 			if (brightness) {
-				USART_puts("on(l1)\r\n)");
+				USART_puts("on(l1)\r\n");
 				*(cz[ch].led2port) &= ~(cz[ch].led2pin) ;
 			} else {
-				USART_puts("off(l1)\r\n)");
+				USART_puts("off(l1)\r\n");
 				*(cz[ch].led2port) |= cz[ch].led2pin ;
 			}
 			break ;
