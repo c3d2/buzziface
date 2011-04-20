@@ -31,7 +31,7 @@
 
 //uint8_t wait_keys_blocking(uint8_t keymask /* TODO timeout?,*/ );
 
-uint8_t send_uart_key(uint8_t key);
+uint8_t send_uart_key(uint8_t key , uint8_t is_key_up_ev);
 static void PCI_init(void );
 static void phasentimer_init(void);
 static uint8_t do_command (uint8_t * commline);
@@ -51,90 +51,92 @@ volatile uint8_t key_buf;
 
 #undef KEYS_HAVE_EXTERN_PULLUP
 
-volatile uint8_t phasemask_b;
-volatile uint8_t phasemask_d;
+volatile uint8_t changedmask;
+volatile uint8_t hasunicorn;
+volatile uint8_t pendingmask;
+#define MAXUNICORN (6)
+volatile uint8_t phasechanged[MAXUNICORN];
+volatile uint8_t unicorn; //index to last free in phasechanged
+
 volatile uint8_t sendline[SENDPLACESIZE] ;
 volatile uint8_t sendplace ;
 
 struct channel cz[5];
 
 
-
-//TODO:
-//reduce PCIRQ indem die semantik von phasemask und PCMSK getauscht wird.
-
 ISR(PCINT0_vect)
 {
 	uint8_t act ;
 	act = ~PINB & (MASKI_B);
 	if (act){  //one ore some of allowed ins are high
-	USART_puts("p");
-	//USART_putc('0'+ act);
 		switch (act){
 			case (1 << 0): //Chan A key is B0 --> PCINT0 
 			case (1 << 1): //Chan B key is B1 --> PCINT1
-				USART_putc('0'+act);
 				PCMSK0 &= ~(act);
-				phasemask_b &= ~(act);
-				sendline[sendplace++] = act;
-					break;
+				changedmask |= act; 
+				if (act & ~(hasunicorn)){
+					phasechanged[unicorn++] = act;
+					hasunicorn |= act ;
+				}
+				break;
 			default :
 				sendline[sendplace++] = 'G'; //invalid
 
 		}
-#ifdef DEBUG_SENDPLACE_ON
-		if(sendplace >7) USART_puts("Xsenpl>7\n\r");
-#endif 
+		if(unicorn >= MAXUNICORN) USART_puts("unicornl> MAX\n\r");
 	} 
 }
 
 ISR(PCINT2_vect) {
 	uint8_t act,c ;
 	act = ~PIND & MASKI_D ;
-	USART_puts("Xfickn\n\r");
-
 	if (act){
 		switch (act){
 			case (1 << 6): //Chan C key is D6 --> PCINT22
 				c=CHAN_C;
-				phasemask_d &= ~(act);
 				PCMSK2 &= ~(act);
 				break;
 			case (1 << 7): //Chan D key is D7 --> PCINT23
 				c=CHAN_D;
-				phasemask_d &= ~(act);
 				PCMSK2 &= ~(act);
 				break;
 			case (1<<4): //Chan E key is D4 --> PCINT20
 				c=CHAN_E;
-				phasemask_d &= ~(act);
 				PCMSK2 &= ~(act);
 				break;
 			default :
-				c= 0xff;
+				c= 0x0;
 		}
-		sendline[sendplace++] = c;
-#ifdef DEBUG_SENDPLACE_ON
-		if(sendplace >7) USART_puts("Xsenpl>7\n\r");
-#endif
+				if (c )
+				{
+				changedmask |= (1<<c);
+				if (c & ~(hasunicorn)) {
+					phasechanged[unicorn++] = c;
+					hasunicorn |= c;
+				}
+				if(unicorn >= MAXUNICORN) USART_puts("unicornl> MAX\n\r");
+				}	
 	}
 }
 
 ISR(TIMER0_COMPA_vect) {
 
-	uint8_t j;
-
-	//bis die letzte phase ausgeschaltet worden:
-	j = MASKI_B & ( phasemask_b ^ MASKI_B) ;
-	phasemask_b = MASKI_B;
-	//im pCMSK re nur die setzen die wieder an, die zu j nicht gehören, weil sie schon in der vorletzten phae deaktiviert wurden
-	PCMSK0 |= (MASKI_B & (~ j) ) ;
-
-	//same for PCIE2
-	j = MASKI_D & (phasemask_d ^ MASKI_D) ;
-	phasemask_d = MASKI_D ;
-	PCMSK2 |= (MASKI_D & ( ~ j)) ;
-
+	uint8_t j ,c;
+	if(!changedmask) {//es gab keine flanken
+		/* flanken wieder erlauben zu finden*/
+		for (j=0; j <8 ; j++){
+			c = phasechanged[j];
+			if (c)
+				send_uart_key(c , (*(cz[c-1].keyport) & (1 << cz[c-1].keypin) ) ) ;
+			phasechanged[j] =0;
+		}
+		unicorn =0;
+		hasunicorn =0;
+	}
+	//flanken wieder suchen:
+	changedmask = 0;
+	PCMSK0 |= (MASKI_B) ;
+	PCMSK2 |= (MASKI_D) ;
 }
 
 
@@ -209,7 +211,7 @@ static inline void phasentimer_init()
 //(1.0/19) * 18 = 0.9473684 -> phasenwechsel alle ~ millisekunde
 	TCCR0A = 0 | (1 << WGM01);              // CTC Modus
 	TCCR0B = 0 | (1<< CS02) | (1<< CS00);   //Prescale 1024
-	OCR0A =  200; //0x09 ; 				//9 ist 18/2 s.o.
+	OCR0A =  20; //0x09 ; 				//9 ist 18/2 s.o.
 	TIMSK0 = 0 |  (1<<OCIE0A);		//IRQ CTM erlauben 
 	return;
 }
@@ -232,16 +234,20 @@ uint8_t set_led_state(ledid_t  led_id, uint8_t brightness)
 	switch (led_id.led){
 		case (0) :
 			if (brightness) {
-				*(cz[ch].led1port) |= cz[ch].led1pin ;
-			} else {
+				USART_puts("on(l0)\r\n)");
 				*(cz[ch].led2port) &= ~(cz[ch].led1pin) ;
+			} else {
+				USART_puts("off(l0)\r\n)");
+				*(cz[ch].led1port) |= cz[ch].led1pin ;
 			}
 			break ;
 		case (1) :
 			if (brightness) {
-				*(cz[ch].led2port) |= cz[ch].led2pin ;
-			} else {
+				USART_puts("on(l1)\r\n)");
 				*(cz[ch].led2port) &= ~(cz[ch].led2pin) ;
+			} else {
+				USART_puts("off(l1)\r\n)");
+				*(cz[ch].led2port) |= cz[ch].led2pin ;
 			}
 			break ;
 		default:
@@ -251,11 +257,13 @@ uint8_t set_led_state(ledid_t  led_id, uint8_t brightness)
 }
 
 
-uint8_t send_uart_key(uint8_t key){
+uint8_t send_uart_key(uint8_t key ,uint8_t is_key_up_ev){
 	char c ;
 	char buf[5] = "K%\n\r";
-	USART_puts("k:");
-	USART_putc(96+key);
+	if ( is_key_up_ev ){
+		//key down event get small k
+		buf[0] = 'k';
+	}
 	switch (key){
 		case CHAN_A:
 			c = 'A';
@@ -288,7 +296,10 @@ static inline uint8_t  do_setled_command(uint8_t * commline){
 		case 'C':
 		case 'D':
 		case 'E':
+			USART_puts("\r\nsetled ");
+			USART_putc(commline[0]);
 			lid.channel = commline[0] - 'A';
+			break;
 
 		default:
 			return ERROR_COMCHAN ;
@@ -296,7 +307,9 @@ static inline uint8_t  do_setled_command(uint8_t * commline){
 	switch (commline[1]){
 		case '1':
 		case '2':
+			USART_putc(commline[1]);
 			lid.led = commline[1] - '1';
+			break;
 
 		default:
 			return ERROR_COMLED ;
@@ -324,7 +337,7 @@ static uint8_t do_command (uint8_t * commline){
 int main(void)
 {
 	uint8_t  commandbuf[8];
-	uint8_t  commidx=0 , i=0 ,k;
+	uint8_t  commidx=0 , i=0 ;
 	hardware_init();
 	sei();
 //------------------------------------
@@ -337,9 +350,10 @@ int main(void)
 		/* PART 1 :check if host tells us to do something:*/
 		i = uart_getc_nb(&commandbuf[commidx]);
 		if(i){
-			if (commandbuf[commidx] == '\n'){
+			if (commandbuf[commidx] == 'Q'){
 				//befehlszeile zu ende :-)
 				commandbuf[commidx] = 0 ;
+				USART_puts(commandbuf); //DEBUG
 				do_command(commandbuf);
 				commidx = 0;
 				commandbuf[0] = 0 ;
@@ -351,21 +365,6 @@ int main(void)
 				}
 			}
 		}
-
-		/*PART 2 : send stuff to send,  if any... */
-		i = 0;
-		cli();  //prevent sendplace from bein altered //TODO: better only disable all PC IRQS
-		if (i<sendplace){
-			USART_puts("snd buf:");
-			while (i < sendplace ) {
-				USART_putc('0'+i);
-				send_uart_key(sendline[sendplace]);
-				i++;
-			}
-			//sendplace = 0;
-			USART_puts("flushed\n\r");
-		}
-		sei();
 	}
 
 	/* never gets here*/
