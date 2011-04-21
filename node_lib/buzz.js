@@ -1,13 +1,15 @@
 var serialport = require('serialport');
 var events = require('events');
 
+// create a buzzer interface
+// - device: path to the serial device (e.g. /dev/ttyUSB0)
 function Buzz(device) {
     var options = {
         baudrate: 115200,
         databits: 8,
         parity: 0,
         stopbits: 1,
-        parser: serialport.parsers.readline("\n\r"),
+        parser: serialport.parsers.readline("Q"),
     }
 
     var that  = this;
@@ -19,18 +21,31 @@ function Buzz(device) {
     });
 }
 
+// implements the following events:
+// - button(player)
 Buzz.prototype = new events.EventEmitter();
 
-Buzz.prototype.set_led = function (led, brightness) {
-    buf = new Buffer("L$$\n\r");
+// set leds on or off
+// - player: [0-3]
+// - led: the led of the player [0-1]
+// - brightness the brightness of the led [0-1]
+Buzz.prototype.set_led = function (player, led, brightness) {
+    buf = new Buffer("QL$$$Q");
 
-    buf[1] = '0'.charCodeAt(0) + led;
-    buf[2] = brightness ? 0xff : 0x00;
+    buf[1] = 'A'.charCodeAt(0) + player;
+    buf[2] = '0'.charCodeAt(0) + led;
+
+    if(brightness) {
+        buf[3] = '1'.charCodeAt(0);
+    } else {
+        buf[3] = '0'.charCodeAt(0);
+    }
 
     // async?
     this.port.write(buf);
 };
 
+// close the connection to the buzzer
 Buzz.prototype.close = function () {
     this.port.close();
 }
