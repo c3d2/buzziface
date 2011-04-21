@@ -233,7 +233,7 @@ uint8_t set_led_state(ledid_t  led_id, uint8_t brightness)
 	uint8_t ch=led_id.channel;
 	switch (led_id.led){
 		case (0) :
-			if (brightness) {
+			if (brightness == '1') {
 				USART_puts("on(l0)\r\n");
 				*(cz[ch].led2port) &= ~(cz[ch].led1pin) ;
 			} else {
