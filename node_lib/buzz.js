@@ -34,13 +34,13 @@ Buzz.prototype = new events.EventEmitter();
 Buzz.prototype.set_led = function (player, led, brightness) {
     buf = new Buffer("QL$$$Q");
 
-    buf[1] = 'A'.charCodeAt(0) + player;
-    buf[2] = '0'.charCodeAt(0) + led;
+    buf[2] = 'A'.charCodeAt(0) + player;
+    buf[3] = '1'.charCodeAt(0) + led;
 
     if(brightness) {
-        buf[3] = '1'.charCodeAt(0);
+        buf[4] = '1'.charCodeAt(0);
     } else {
-        buf[3] = '0'.charCodeAt(0);
+        buf[4] = '0'.charCodeAt(0);
     }
 
     // async?
