@@ -18,7 +18,7 @@ function Buzz(device) {
 
     port.on("data", function(data) {
         if(data[0] == "K") {
-            that.emit("button", data[1] - 'A'.charCodeAt(0));
+            that.emit("button", data[1].charCodeAt(0) - 'A'.charCodeAt(0));
         }
     });
 }
