@@ -3,7 +3,7 @@
  *
  *       Filename:  buzzIface.c
  *
- *    Description:  this is the first test
+ *    Description:  yeah... protocoll might be little weird.
  *
  *        Version:  0.0
  *       Revision:  none
@@ -40,12 +40,8 @@ static uint8_t do_command (uint8_t * commline);
 
 volatile uint8_t key_buf;
 
-
-
-
-
 #define MASKI_B (0x03)
-#define MASKI_D (0xd0)
+#define MASKI_D ( (1<<6)|(1<<7)|(1<<4))
 #define SENDPLACESIZE (8)
 #define DEBUG_SENDPLACE_ON
 
@@ -55,11 +51,8 @@ volatile uint8_t changedmask;
 volatile uint8_t hasunicorn;
 volatile uint8_t pendingmask;
 #define MAXUNICORN (6)
-volatile uint8_t phasechanged[MAXUNICORN];
+volatile uint8_t phasechanged[MAXUNICORN]={0};
 volatile uint8_t unicorn; //index to last free in phasechanged
-
-volatile uint8_t sendline[SENDPLACESIZE] ;
-volatile uint8_t sendplace ;
 
 struct channel cz[5];
 
@@ -80,7 +73,8 @@ ISR(PCINT0_vect)
 				}
 				break;
 			default :
-				sendline[sendplace++] = 'G'; //invalid
+				;
+				//
 
 		}
 		if(unicorn >= MAXUNICORN) USART_puts("unicornl> MAX\n\r");
@@ -90,6 +84,8 @@ ISR(PCINT0_vect)
 ISR(PCINT2_vect) {
 	uint8_t act,c ;
 	act = ~PIND & MASKI_D ;
+	USART_putc((act>>6) + '0');
+	USART_puts("<act\r\n");
 	if (act){
 		switch (act){
 			case (1 << 6): //Chan C key is D6 --> PCINT22
@@ -124,10 +120,11 @@ ISR(TIMER0_COMPA_vect) {
 	uint8_t j ,c;
 	if(!changedmask) {//es gab keine flanken
 		/* flanken wieder erlauben zu finden*/
-		for (j=0; j <8 ; j++){
+		for (j=0; j <MAXUNICORN ; j++){
 			c = phasechanged[j];
-			if (c)
+			if (c){
 				send_uart_key(c , (*(cz[c-1].keyport) & (1 << cz[c-1].keypin) ) ) ;
+			}
 			phasechanged[j] =0;
 		}
 		unicorn =0;
@@ -182,27 +179,24 @@ static inline void hardware_init(void)
 	
 	for(i=0; i< CHAN_NUM ; i++){
 		/*leds get outputs */
-		*(port2ddr(cz[i].led1port)) |= cz[i].led1pin ;
-		*(port2ddr(cz[i].led2port)) |= cz[i].led2pin ;
+		*(port2ddr(cz[i].led1port)) |= (1<<cz[i].led1pin) ;
+		*(port2ddr(cz[i].led2port)) |= (1<<cz[i].led2pin) ;
 		/* initially set to 1 (led off) */
-		*(cz[i].led1port) |= cz[i].led1pin ;
-		*(cz[i].led2port) |= cz[i].led2pin ;
+		*(cz[i].led1port) |= (1<<cz[i].led1pin) ;
+		*(cz[i].led2port) |= (1<<cz[i].led2pin) ;
 		/* keys inputs */
 		*(pin2ddr(cz[i].keyport)) &= ~(cz[i].keypin) ;
 #ifndef KEYS_HAVE_EXTERN_PULLUP
-		*(pin2port(cz[i].keyport)) |= cz[i].keypin;
+		*(pin2port(cz[i].keyport)) |= (1<<cz[i].keypin);
 #else
-		*(pin2port(cz[i].keyport)) &= ~(cz[i].keypin);
+		*(pin2port(cz[i].keyport)) &= ~(1<<cz[i].keypin);
 #endif		
 	} 
 
-	sendplace = 0 ;
 	USART_Init();
 	PCI_init();
 	phasentimer_init();
 }
-
-
 
 static inline void phasentimer_init()
 {
@@ -211,7 +205,7 @@ static inline void phasentimer_init()
 //(1.0/19) * 18 = 0.9473684 -> phasenwechsel alle ~ millisekunde
 	TCCR0A = 0 | (1 << WGM01);              // CTC Modus
 	TCCR0B = 0 | (1<< CS02) | (1<< CS00);   //Prescale 1024
-	OCR0A =  20; //0x09 ; 				//9 ist 18/2 s.o.
+	OCR0A =  90; //0x09 ; 				//9 ist 18/2 s.o.
 	TIMSK0 = 0 |  (1<<OCIE0A);		//IRQ CTM erlauben 
 	return;
 }
@@ -226,8 +220,6 @@ static inline void PCI_init()
 	return;
 }
 
-
-
 uint8_t set_led_state(ledid_t  led_id, uint8_t brightness)
 {
 	uint8_t ch=led_id.channel;
@@ -235,19 +227,20 @@ uint8_t set_led_state(ledid_t  led_id, uint8_t brightness)
 		case (0) :
 			if (brightness == '1') {
 				USART_puts("on(l0)\r\n");
-				*(cz[ch].led2port) &= ~(cz[ch].led1pin) ;
+				
+				*(cz[ch].led1port) &= ~ (1<<cz[ch].led1pin) ;
 			} else {
 				USART_puts("off(l0)\r\n");
-				*(cz[ch].led1port) |= cz[ch].led1pin ;
+				*(cz[ch].led1port) |= (1<< cz[ch].led1pin) ;
 			}
 			break ;
 		case (1) :
-			if (brightness) {
+			if (brightness=='1') {
 				USART_puts("on(l1)\r\n");
-				*(cz[ch].led2port) &= ~(cz[ch].led2pin) ;
+				*(cz[ch].led2port) &= ~( 1<< cz[ch].led2pin) ;
 			} else {
 				USART_puts("off(l1)\r\n");
-				*(cz[ch].led2port) |= cz[ch].led2pin ;
+				*(cz[ch].led2port) |= (1<<cz[ch].led2pin) ;
 			}
 			break ;
 		default:
@@ -259,10 +252,10 @@ uint8_t set_led_state(ledid_t  led_id, uint8_t brightness)
 
 uint8_t send_uart_key(uint8_t key ,uint8_t is_key_up_ev){
 	char c ;
-	char buf[5] = "K%\n\r";
+	char buf[5] = "K%\r\n";
 	if ( is_key_up_ev ){
 		//key down event get small k
-		buf[0] = 'k';
+		buf[0] = 'm';
 	}
 	switch (key){
 		case CHAN_A:
@@ -316,9 +309,6 @@ static inline uint8_t  do_setled_command(uint8_t * commline){
 	}
 	return set_led_state (lid, commline[2]) ;
 }
-
-	
-
 
 
 static uint8_t do_command (uint8_t * commline){
