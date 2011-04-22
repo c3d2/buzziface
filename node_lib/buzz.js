@@ -9,7 +9,7 @@ function Buzz(device) {
         databits: 8,
         parity: 0,
         stopbits: 1,
-        parser: serialport.parsers.readline("Q"),
+        parser: serialport.parsers.readline("\r\n"),
     }
 
     var that  = this;
@@ -17,7 +17,9 @@ function Buzz(device) {
     this.port = port = new serialport.SerialPort(device, options);
 
     port.on("data", function(data) {
-        that.emit("button", data[1] - '0'.charCodeAt(0));
+        if(data[0] == "K") {
+            that.emit("button", data[1] - 'A'.charCodeAt(0));
+        }
     });
 }
 
