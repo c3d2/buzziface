@@ -9,7 +9,7 @@ function Buzz(device) {
         databits: 8,
         parity: 0,
         stopbits: 1,
-        parser: serialport.parsers.readline("\r\n"),
+        parser: serialport.parsers.readline("\n"),
     }
 
     var that  = this;
