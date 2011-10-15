@@ -33,7 +33,7 @@ Buzz.prototype = new events.EventEmitter();
 // - brightness the brightness of the led [0-1]
 Buzz.prototype.set_led = function (player, brightness) {
     // there is only one in the hardware
-    var led = 0;
+    var led = 1;
 
     var buf = new Buffer("QL$$$Q");
 
