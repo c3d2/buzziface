@@ -38,6 +38,17 @@ Buzz.prototype = new events.EventEmitter();
 // - led: the led of the player [0-1]
 // - brightness the brightness of the led [0-1]
 Buzz.prototype.set_led = function (player, brightness) {
+    if (brightness)
+	brightness = 0;
+    else
+	brightness = 1;
+    // die Ansteuerung funktioniert, aber bei buzzer B und C sind die
+    // led pins (in der firmware) vertauscht. d.h. keyB hat ledC und
+    // keyC hat ledB.
+    if (player === 1)
+	player = 2;
+    else if (player === 2)
+	player = 1;
     // there is only one in the hardware
     var led = 1;
 
