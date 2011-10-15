@@ -21,6 +21,12 @@ function Buzz(device) {
             that.emit("button", data[1].charCodeAt(0) - 'A'.charCodeAt(0));
         }
     });
+
+    // TODO: quickfixing
+    var i;
+    for(i = 0; i < 4; ++i) {
+        that.set_led(i, 0);
+    }
 }
 
 // implements the following events:
@@ -32,15 +38,35 @@ Buzz.prototype = new events.EventEmitter();
 // - led: the led of the player [0-1]
 // - brightness the brightness of the led [0-1]
 Buzz.prototype.set_led = function (player, brightness) {
+    if (brightness)
+	brightness = 0;
+    else
+	brightness = 1;
+    // die Ansteuerung funktioniert, aber bei buzzer B und C sind die
+    // led pins (in der firmware) vertauscht. d.h. keyB hat ledC und
+    // keyC hat ledB.
+    if (player === 1)
+	player = 2;
+    else if (player === 2)
+	player = 1;
     // there is only one in the hardware
-    var led = 0;
+    var led = 1;
+
+    // TODO: remove me later, i am a quickfix
+    if(player == 2) {
+        player = 1;
+    }
+    if(player == 1) {
+        player = 2;
+    }
 
     var buf = new Buffer("QL$$$Q");
 
     buf[2] = 'A'.charCodeAt(0) + player;
     buf[3] = '1'.charCodeAt(0) + led;
 
-    if(brightness) {
+    // TODO: another quickfix
+    if(!brightness) {
         buf[4] = '1'.charCodeAt(0);
     } else {
         buf[4] = '0'.charCodeAt(0);
